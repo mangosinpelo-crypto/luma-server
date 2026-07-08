@@ -11,14 +11,14 @@ const router = Router();
  */
 router.post('/completions', async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, isRetry } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array requerido' });
     }
 
     // Check daily limit for free tier
-    if (req.tier === 'free') {
+    if (req.tier === 'free' && !isRetry) {
       if (req.dailyMessageCount >= req.tierFeatures.maxMessagesPerDay) {
         return res.status(429).json({
           error: 'Límite diario alcanzado',
@@ -44,7 +44,7 @@ router.post('/completions', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000);
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
     req.on('close', () => {
       controller.abort();
