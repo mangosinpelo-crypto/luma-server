@@ -90,7 +90,7 @@ router.post('/completions', async (req, res) => {
   } catch (error) {
     console.error('Chat proxy error:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Error al procesar el mensaje' });
+      res.status(500).json({ error: 'Error al procesar el mensaje', detalle: error.message });
     } else {
       res.end();
     }
