@@ -13,7 +13,14 @@ import billingRoutes, { handleStripeWebhook } from './routes/billing.js';
 import userRoutes from './routes/user.js';
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
+
+// Request Logger
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // CORS
 const allowedOrigins = [
