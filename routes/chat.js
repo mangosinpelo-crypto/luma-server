@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { streamChatCompletion, getModelForTier } from '../services/openrouter.js';
+import { streamChatCompletion, getModel } from '../services/openrouter.js';
 import supabase from '../services/supabase.js';
 
 const router = Router();
@@ -46,7 +46,7 @@ router.post('/completions', async (req, res) => {
       }
     }
 
-    const model = getModelForTier(req.tier);
+    const model = getModel(req.tier, req.body.arquetipo_id);
 
     // Set up SSE headers for streaming
     res.setHeader('Content-Type', 'text/event-stream');
@@ -70,6 +70,10 @@ router.post('/completions', async (req, res) => {
 
     try {
       while (true) {
+        if (req.destroyed || res.writableEnded) {
+          controller.abort();
+          break;
+        }
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });

@@ -16,12 +16,12 @@ router.get('/', async (req, res) => {
       .single();
 
     if (error && error.code === 'PGRST116') {
-      // No row found — return defaults
+      // No row found — return defaults (arquetipo_id is null so client uses its lumaActiveCharacter)
       return res.json({
         afinidad: 50, enojo: 0, cansancio: 0, ansiedad: 0,
         aburrimiento: 0, resentimiento: 0, celos: 0, nostalgia: 0,
-        rasgos_identidad: [], memory_state: { episodios: [], conocimiento: {}, perfil_psicologico: '' },
-        ignored_count: 0, arquetipo_id: 'pareja', dias_activos: [],
+        rasgos_identidad: [], memory_state: { episodios: [], conocimiento: {}, perfil_psicologico: '', characters_vault: {} },
+        ignored_count: 0, arquetipo_id: null, dias_activos: [],
         chat_history: []
       });
     }
@@ -40,22 +40,51 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
+    // Whitelist allowed fields — reject anything else
+    const ALLOWED_FIELDS = [
+      'afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento',
+      'resentimiento', 'celos', 'nostalgia', 'rasgos_identidad',
+      'memory_state', 'ignored_count', 'arquetipo_id', 'dias_activos',
+      'chat_history'
+    ];
+
+    const sanitized = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (req.body[key] !== undefined) {
+        sanitized[key] = req.body[key];
+      }
+    }
+
+    // Validate numeric fields are within 0-100
+    const numericFields = ['afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento', 'resentimiento', 'celos', 'nostalgia'];
+    for (const field of numericFields) {
+      if (sanitized[field] !== undefined) {
+        const val = Number(sanitized[field]);
+        if (isNaN(val) || val < 0 || val > 100) {
+          return res.status(400).json({ error: `Campo ${field} debe ser un número entre 0 y 100` });
+        }
+        sanitized[field] = val;
+      }
+    }
+
+    // Validate ignored_count
+    if (sanitized.ignored_count !== undefined) {
+      const val = Number(sanitized.ignored_count);
+      if (isNaN(val) || val < 0) {
+        return res.status(400).json({ error: 'ignored_count debe ser un número >= 0' });
+      }
+      sanitized.ignored_count = val;
+    }
+
+    // Validate arquetipo_id
+    const VALID_ARQUETIPOS = ['pareja', 'amigaToxica', 'rival', 'ex', 'mejorAmigo'];
+    if (sanitized.arquetipo_id && !VALID_ARQUETIPOS.includes(sanitized.arquetipo_id)) {
+      return res.status(400).json({ error: 'arquetipo_id inválido' });
+    }
+
     const payload = {
       user_id: req.userId,
-      afinidad: req.body.afinidad,
-      enojo: req.body.enojo,
-      cansancio: req.body.cansancio,
-      ansiedad: req.body.ansiedad,
-      aburrimiento: req.body.aburrimiento,
-      resentimiento: req.body.resentimiento,
-      celos: req.body.celos,
-      nostalgia: req.body.nostalgia,
-      rasgos_identidad: req.body.rasgos_identidad,
-      memory_state: req.body.memory_state,
-      ignored_count: req.body.ignored_count,
-      arquetipo_id: req.body.arquetipo_id,
-      dias_activos: req.body.dias_activos,
-      chat_history: req.body.chat_history,
+      ...sanitized,
       updated_at: new Date().toISOString()
     };
 
@@ -135,6 +164,18 @@ router.post('/episodes', async (req, res) => {
       .insert({ user_id: req.userId, text });
 
     if (error) throw error;
+    
+    // Non-blocking cleanup of episodes older than 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    supabase.from('episodes')
+      .delete()
+      .eq('user_id', req.userId)
+      .lt('created_at', thirtyDaysAgo.toISOString())
+      .then(({ error: cleanupError }) => { 
+        if (cleanupError) console.error('Cleanup error:', cleanupError); 
+      });
+
     res.json({ ok: true });
   } catch (err) {
     console.error('Episode POST error:', err);

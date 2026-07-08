@@ -3,7 +3,7 @@ import supabase from '../services/supabase.js';
 // Feature definitions per tier
 const TIER_FEATURES = {
   free: {
-    maxMessagesPerDay: 20,
+    maxMessagesPerDay: 10,
     maxInternalPerDay: 10,
     arquetipos: ['mejorAmigo'],
     autonomousMessages: false,

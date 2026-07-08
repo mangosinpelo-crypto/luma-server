@@ -33,11 +33,14 @@ export async function streamChatCompletion(messages, model, abortSignal) {
 }
 
 /**
- * Returns the model string based on user tier.
+ * Returns the model string based on user tier and archetype.
  */
-export function getModelForTier(tier) {
+export function getModel(tier, arquetipoId) {
   if (tier === 'premium' || tier === 'obsesion') {
     return process.env.PREMIUM_MODEL || 'google/gemma-2-9b-it:free';
   }
+  // Free tier options based on arquetipo to give distinct flavor for free
+  if (arquetipoId === 'ex') return 'meta-llama/llama-3-8b-instruct:free';
+  if (arquetipoId === 'rival') return 'microsoft/phi-3-mini-128k-instruct:free';
   return process.env.FREE_MODEL || 'google/gemma-2-9b-it:free';
 }

@@ -62,6 +62,16 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+// Strict rate limit for chat: 15 requests per minute per IP
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Límite de chat alcanzado. Espera un momento.' }
+});
+app.use('/api/chat', chatLimiter);
+
 // Health check (no auth required)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', name: 'Luma API', version: '1.0.0' });
