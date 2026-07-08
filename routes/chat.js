@@ -47,6 +47,7 @@ router.post('/completions', async (req, res) => {
     }
 
     const model = getModel(req.tier, req.body.arquetipo_id);
+    console.log(`[CHAT] Model: ${model}, Tier: ${req.tier}, Messages: ${messages.length}`);
 
     // Set up SSE headers for streaming
     res.setHeader('Content-Type', 'text/event-stream');
