@@ -11,28 +11,39 @@ const router = Router();
  */
 router.post('/completions', async (req, res) => {
   try {
-    const { messages, isRetry } = req.body;
+    const { messages, isRetry, isInternal } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array requerido' });
     }
 
-    // Check daily limit for free tier
+    // Check limits for free tier
     if (req.tier === 'free' && !isRetry) {
-      if (req.dailyMessageCount >= req.tierFeatures.maxMessagesPerDay) {
-        return res.status(429).json({
-          error: 'Límite diario alcanzado',
-          limit: req.tierFeatures.maxMessagesPerDay,
-          upgrade: true,
-          message: `Has alcanzado tu límite de ${req.tierFeatures.maxMessagesPerDay} mensajes diarios. Mejora tu plan para mensajes ilimitados.`
-        });
+      if (isInternal) {
+        if (req.dailyInternalCount >= req.tierFeatures.maxInternalPerDay) {
+          return res.status(429).json({
+            error: 'Límite interno alcanzado',
+            isInternal: true
+          });
+        }
+        await supabase
+          .from('users')
+          .update({ daily_internal_count: req.dailyInternalCount + 1 })
+          .eq('id', req.userId);
+      } else {
+        if (req.dailyMessageCount >= req.tierFeatures.maxMessagesPerDay) {
+          return res.status(429).json({
+            error: 'Límite diario alcanzado',
+            limit: req.tierFeatures.maxMessagesPerDay,
+            upgrade: true,
+            message: `Has agotado tus ${req.tierFeatures.maxMessagesPerDay} mensajes diarios. Mejora tu plan para seguir hablando.`
+          });
+        }
+        await supabase
+          .from('users')
+          .update({ daily_message_count: req.dailyMessageCount + 1 })
+          .eq('id', req.userId);
       }
-
-      // Increment daily counter
-      await supabase
-        .from('users')
-        .update({ daily_message_count: req.dailyMessageCount + 1 })
-        .eq('id', req.userId);
     }
 
     const model = getModelForTier(req.tier);

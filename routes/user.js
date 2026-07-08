@@ -12,7 +12,7 @@ router.get('/me', async (req, res) => {
   try {
     const { data } = await supabase
       .from('users')
-      .select('tier, daily_message_count, created_at')
+      .select('tier, daily_message_count, daily_internal_count, created_at')
       .eq('id', req.userId)
       .single();
 
@@ -24,6 +24,7 @@ router.get('/me', async (req, res) => {
       tier,
       features: TIER_FEATURES[tier] || TIER_FEATURES.free,
       dailyMessageCount: data?.daily_message_count || 0,
+      dailyInternalCount: data?.daily_internal_count || 0,
       createdAt: data?.created_at
     });
   } catch (err) {

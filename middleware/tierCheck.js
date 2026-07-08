@@ -3,7 +3,8 @@ import supabase from '../services/supabase.js';
 // Feature definitions per tier
 const TIER_FEATURES = {
   free: {
-    maxMessagesPerDay: 15,
+    maxMessagesPerDay: 20,
+    maxInternalPerDay: 10,
     arquetipos: ['mejorAmigo'],
     autonomousMessages: false,
     evolution: false,
@@ -14,6 +15,7 @@ const TIER_FEATURES = {
   },
   premium: {
     maxMessagesPerDay: Infinity,
+    maxInternalPerDay: Infinity,
     arquetipos: ['pareja', 'amigaToxica', 'rival', 'ex', 'mejorAmigo'],
     autonomousMessages: true,
     evolution: true,
@@ -24,6 +26,7 @@ const TIER_FEATURES = {
   },
   obsesion: {
     maxMessagesPerDay: Infinity,
+    maxInternalPerDay: Infinity,
     arquetipos: ['pareja', 'amigaToxica', 'rival', 'ex', 'mejorAmigo'],
     autonomousMessages: true,
     evolution: true,
@@ -42,7 +45,7 @@ export async function loadTier(req, res, next) {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('tier, daily_message_count, daily_message_reset')
+      .select('tier, daily_message_count, daily_internal_count, daily_message_reset')
       .eq('id', req.userId)
       .single();
 
@@ -57,6 +60,7 @@ export async function loadTier(req, res, next) {
       req.tier = 'free';
       req.tierFeatures = TIER_FEATURES.free;
       req.dailyMessageCount = 0;
+      req.dailyInternalCount = 0;
       return next();
     }
 
@@ -66,20 +70,23 @@ export async function loadTier(req, res, next) {
     if (resetDate.toDateString() !== now.toDateString()) {
       await supabase
         .from('users')
-        .update({ daily_message_count: 0, daily_message_reset: now.toISOString() })
+        .update({ daily_message_count: 0, daily_internal_count: 0, daily_message_reset: now.toISOString() })
         .eq('id', req.userId);
       data.daily_message_count = 0;
+      data.daily_internal_count = 0;
     }
 
     req.tier = data.tier || 'free';
     req.tierFeatures = TIER_FEATURES[req.tier] || TIER_FEATURES.free;
     req.dailyMessageCount = data.daily_message_count || 0;
+    req.dailyInternalCount = data.daily_internal_count || 0;
     next();
   } catch (err) {
     console.error('Tier check error:', err);
     req.tier = 'free';
     req.tierFeatures = TIER_FEATURES.free;
     req.dailyMessageCount = 0;
+    req.dailyInternalCount = 0;
     next();
   }
 }
