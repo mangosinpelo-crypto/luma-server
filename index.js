@@ -32,15 +32,13 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    // Allow if origin matches FRONTEND_URL or is localhost
     if (allowedOrigins.includes(origin) || origin.endsWith('.workers.dev')) {
       return callback(null, true);
     }
-    // Fallback: if they just provided the domain name without https://
     if (process.env.FRONTEND_URL && origin.includes(process.env.FRONTEND_URL.replace('https://', '').replace('http://', ''))) {
       return callback(null, true);
     }
-    return callback(null, true); // For now, just allow all origins to fix the user's issue, we can secure it later.
+    return callback(new Error('Not allowed by CORS'));
   },
   credentials: true
 }));
