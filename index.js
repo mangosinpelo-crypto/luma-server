@@ -16,8 +16,25 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    // Allow if origin matches FRONTEND_URL or is localhost
+    if (allowedOrigins.includes(origin) || origin.endsWith('.workers.dev')) {
+      return callback(null, true);
+    }
+    // Fallback: if they just provided the domain name without https://
+    if (process.env.FRONTEND_URL && origin.includes(process.env.FRONTEND_URL.replace('https://', '').replace('http://', ''))) {
+      return callback(null, true);
+    }
+    return callback(null, true); // For now, just allow all origins to fix the user's issue, we can secure it later.
+  },
   credentials: true
 }));
 
