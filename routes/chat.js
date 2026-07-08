@@ -69,6 +69,7 @@ router.post('/completions', async (req, res) => {
     const reader = openRouterRes.body.getReader();
     const decoder = new TextDecoder();
 
+    let debugBuffer = '';
     try {
       while (true) {
         if (req.destroyed || res.writableEnded) {
@@ -78,6 +79,7 @@ router.post('/completions', async (req, res) => {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        if (debugBuffer.length < 500) debugBuffer += chunk;
         res.write(chunk);
       }
     } catch (streamErr) {
@@ -85,6 +87,7 @@ router.post('/completions', async (req, res) => {
         console.error('Stream error:', streamErr);
       }
     } finally {
+      console.log(`[CHAT] Stream finished. First 500 chars:`, debugBuffer.substring(0, 500));
       clearTimeout(timeout);
       res.end();
     }
