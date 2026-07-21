@@ -11,6 +11,7 @@ import chatRoutes from './routes/chat.js';
 import memoryRoutes from './routes/memory.js';
 import billingRoutes, { handleStripeWebhook } from './routes/billing.js';
 import userRoutes from './routes/user.js';
+import audioRoutes from './routes/audio.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -38,7 +39,7 @@ app.use(cors({
     if (process.env.FRONTEND_URL && origin.includes(process.env.FRONTEND_URL.replace('https://', '').replace('http://', ''))) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    return callback(null, false);
   },
   credentials: true
 }));
@@ -82,6 +83,7 @@ app.use('/api/chat', requireAuth, loadTier, chatRoutes);
 app.use('/api/memory', requireAuth, loadTier, memoryRoutes);
 app.use('/api/billing', requireAuth, loadTier, billingRoutes);
 app.use('/api/user', requireAuth, loadTier, userRoutes);
+app.use('/api/audio', requireAuth, loadTier, audioRoutes);
 
 // Start server
 app.listen(PORT, () => {

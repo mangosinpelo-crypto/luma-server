@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { streamChatCompletion, getModel } from '../services/openrouter.js';
 import supabase from '../services/supabase.js';
+import { isArchetypeAllowed } from '../middleware/tierCheck.js';
 
 const router = Router();
 
@@ -11,13 +12,21 @@ const router = Router();
  */
 router.post('/completions', async (req, res) => {
   try {
-    const { messages, isRetry, isInternal } = req.body;
+    const { messages, isRetry, isInternal, arquetipo_id } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array requerido' });
     }
 
-    // Check limits for free tier
+    // Verify archetype authorization for user's tier
+    if (arquetipo_id && !isArchetypeAllowed(req.tier, arquetipo_id)) {
+      return res.status(403).json({
+        error: 'El arquetipo seleccionado no está disponible en tu plan actual.',
+        upgrade: true
+      });
+    }
+
+    // Pre-check limit for free tier
     if (req.tier === 'free' && !isRetry) {
       if (isInternal) {
         if (req.dailyInternalCount >= req.tierFeatures.maxInternalPerDay) {
@@ -26,10 +35,6 @@ router.post('/completions', async (req, res) => {
             isInternal: true
           });
         }
-        await supabase
-          .from('users')
-          .update({ daily_internal_count: req.dailyInternalCount + 1 })
-          .eq('id', req.userId);
       } else {
         if (req.dailyMessageCount >= req.tierFeatures.maxMessagesPerDay) {
           return res.status(429).json({
@@ -39,21 +44,11 @@ router.post('/completions', async (req, res) => {
             message: `Has agotado tus ${req.tierFeatures.maxMessagesPerDay} mensajes diarios. Mejora tu plan para seguir hablando.`
           });
         }
-        await supabase
-          .from('users')
-          .update({ daily_message_count: req.dailyMessageCount + 1 })
-          .eq('id', req.userId);
       }
     }
 
-    const model = getModel(req.tier, req.body.arquetipo_id);
-    console.log(`[CHAT] Model: ${model}, Tier: ${req.tier}, Messages: ${messages.length}`);
-
-    // Set up SSE headers for streaming
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
+    const model = getModel(req.tier, arquetipo_id);
+    console.log(`[CHAT] Model: ${model}, Tier: ${req.tier}, Archetype: ${arquetipo_id || 'default'}, Messages: ${messages.length}`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000);
@@ -64,6 +59,33 @@ router.post('/completions', async (req, res) => {
     });
 
     const openRouterRes = await streamChatCompletion(messages, model, controller.signal);
+
+    // Stream started successfully — deduct daily message usage now
+    if (req.tier === 'free' && !isRetry) {
+      if (isInternal) {
+        supabase
+          .from('users')
+          .update({ daily_internal_count: req.dailyInternalCount + 1 })
+          .eq('id', req.userId)
+          .then(({ error }) => { if (error) console.error('Error updating internal count:', error); });
+      } else {
+        supabase
+          .from('users')
+          .update({ daily_message_count: req.dailyMessageCount + 1 })
+          .eq('id', req.userId)
+          .then(({ error }) => { if (error) console.error('Error updating message count:', error); });
+      }
+    }
+
+    // Set up SSE headers for streaming
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    if (!openRouterRes.body) {
+      throw new Error('No stream body returned from AI provider');
+    }
 
     // Pipe the stream directly to the client
     const reader = openRouterRes.body.getReader();

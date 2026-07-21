@@ -143,6 +143,29 @@ export async function handleStripeWebhook(req, res) {
       break;
     }
 
+    case 'customer.subscription.updated': {
+      const sub = event.data.object;
+      const customerId = sub.customer;
+      const status = sub.status;
+
+      const { data } = await supabase
+        .from('users')
+        .select('id')
+        .eq('stripe_customer_id', customerId)
+        .single();
+
+      if (data) {
+        if (['past_due', 'unpaid', 'canceled', 'incomplete_expired'].includes(status)) {
+          await supabase
+            .from('users')
+            .update({ tier: 'free' })
+            .eq('id', data.id);
+          console.log(`⚠️ Subscription status for user ${data.id} is now ${status}. Downgraded to free.`);
+        }
+      }
+      break;
+    }
+
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
       const customerId = sub.customer;
@@ -165,7 +188,7 @@ export async function handleStripeWebhook(req, res) {
 
     case 'invoice.payment_failed': {
       const invoice = event.data.object;
-      console.warn(`⚠️ Payment failed for customer ${invoice.customer}`);
+      console.warn(`⚠️ Payment failed for customer ${invoice.customer}, invoice ${invoice.id}`);
       break;
     }
   }

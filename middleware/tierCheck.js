@@ -108,4 +108,11 @@ export function requireFeature(featureName) {
   };
 }
 
+export function isArchetypeAllowed(tier, arquetipoId) {
+  if (!arquetipoId) return true; // fallback to default archetype if unspecified
+  const features = TIER_FEATURES[tier] || TIER_FEATURES.free;
+  return Array.isArray(features.arquetipos) && features.arquetipos.includes(arquetipoId);
+}
+
 export { TIER_FEATURES };
+

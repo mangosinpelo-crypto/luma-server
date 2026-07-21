@@ -82,6 +82,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'arquetipo_id inválido' });
     }
 
+    // Cap chat_history to last 50 items to prevent unbounded DB growth
+    if (Array.isArray(sanitized.chat_history)) {
+      sanitized.chat_history = sanitized.chat_history.slice(-50);
+    }
+
     const payload = {
       user_id: req.userId,
       ...sanitized,
@@ -117,33 +122,33 @@ router.delete('/', async (req, res) => {
 
 /**
  * GET /api/memory/episodes?keywords=word1,word2
- * Searches episodes by keywords.
+ * Searches episodes by keywords using Postgres ilike filters.
  */
 router.get('/episodes', async (req, res) => {
   try {
-    const keywords = (req.query.keywords || '').split(',').filter(k => k.length > 0);
+    const keywords = (req.query.keywords || '')
+      .split(',')
+      .map(k => k.replace(/[^\w\sñáéíóú]/gi, '').trim())
+      .filter(k => k.length > 0);
 
     if (keywords.length === 0) {
       return res.json([]);
     }
 
-    // Build OR filter for text search
+    // Construct Supabase OR filter for Postgres search: text.ilike.%word1%,text.ilike.%word2%
+    const orCondition = keywords.map(k => `text.ilike.%${k}%`).join(',');
+
     const { data, error } = await supabase
       .from('episodes')
       .select('text, created_at')
       .eq('user_id', req.userId)
+      .or(orCondition)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(3);
 
     if (error) throw error;
 
-    // Client-side keyword filtering (Supabase free tier doesn't have full-text search)
-    const filtered = (data || []).filter(ep => {
-      const lower = ep.text.toLowerCase();
-      return keywords.some(k => lower.includes(k.toLowerCase()));
-    });
-
-    res.json(filtered.slice(0, 3).map(r => r.text));
+    res.json((data || []).map(r => r.text));
   } catch (err) {
     console.error('Episodes GET error:', err);
     res.status(500).json({ error: 'Error buscando episodios' });
