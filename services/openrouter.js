@@ -57,20 +57,13 @@ export async function streamChatCompletion(messages, model, abortSignal, maxToke
  */
 export function getModel(tier, arquetipoId) {
   if (process.env.DEEPINFRA_API_KEY) {
-    return tier === 'premium' || tier === 'obsesion'
-      ? (process.env.PREMIUM_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct')
-      : (process.env.FREE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash');
+    return process.env.PREMIUM_MODEL || 'NousResearch/Hermes-3-Llama-3.1-70B';
   }
 
   if (process.env.GROQ_API_KEY) {
-    return tier === 'premium' || tier === 'obsesion'
-      ? (process.env.PREMIUM_MODEL || 'llama-3.3-70b-versatile')
-      : (process.env.FREE_MODEL || 'llama-3.1-8b-instant');
+    return process.env.PREMIUM_MODEL || 'llama-3.3-70b-versatile';
   }
 
-  if (tier === 'premium' || tier === 'obsesion') {
-    return process.env.PREMIUM_MODEL || 'google/gemma-2-9b-it:free';
-  }
-  return process.env.FREE_MODEL || 'google/gemma-2-9b-it:free';
+  return process.env.PREMIUM_MODEL || 'google/gemma-2-9b-it:free';
 }
 
