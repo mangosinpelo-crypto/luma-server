@@ -12,7 +12,7 @@ const router = Router();
  */
 router.post('/completions', async (req, res) => {
   try {
-    const { messages, isRetry, isInternal, arquetipo_id, max_tokens } = req.body;
+    const { messages, isRetry, isInternal, arquetipo_id, max_tokens, temperature, presence_penalty } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array requerido' });
@@ -60,8 +60,10 @@ router.post('/completions', async (req, res) => {
 
     // Clamp max_tokens from client (min 100, max 500, default 150)
     const clampedMaxTokens = Math.min(500, Math.max(100, Number(max_tokens) || 150));
+    const clampedTemp = Number(temperature) >= 0.1 && Number(temperature) <= 1.5 ? Number(temperature) : 0.8;
+    const clampedPresence = Number(presence_penalty) >= 0 && Number(presence_penalty) <= 1.5 ? Number(presence_penalty) : 0.3;
 
-    const openRouterRes = await streamChatCompletion(messages, model, controller.signal, clampedMaxTokens);
+    const openRouterRes = await streamChatCompletion(messages, model, controller.signal, clampedMaxTokens, clampedTemp, clampedPresence);
 
     // Stream started successfully — deduct daily message usage now
     if (req.tier === 'free' && !isRetry) {

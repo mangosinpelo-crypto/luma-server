@@ -12,7 +12,7 @@ const API_URL = process.env.DEEPINFRA_API_KEY
  * Streams a chat completion from AI provider (OpenRouter / DeepInfra / Groq).
  * Returns a ReadableStream for SSE passthrough.
  */
-export async function streamChatCompletion(messages, model, abortSignal, maxTokens = 150) {
+export async function streamChatCompletion(messages, model, abortSignal, maxTokens = 150, temperature = 0.8, presencePenalty = 0.3) {
   const API_KEY = process.env.DEEPINFRA_API_KEY
     || process.env.GROQ_API_KEY
     || process.env.API_KEY
@@ -36,8 +36,9 @@ export async function streamChatCompletion(messages, model, abortSignal, maxToke
       model,
       messages,
       stream: true,
-      temperature: 0.8,
-      max_tokens: maxTokens
+      temperature,
+      max_tokens: maxTokens,
+      presence_penalty: presencePenalty
     }),
     signal: abortSignal
   });
