@@ -38,7 +38,8 @@ export async function streamChatCompletion(messages, model, abortSignal, maxToke
       stream: true,
       temperature,
       max_tokens: maxTokens,
-      presence_penalty: presencePenalty
+      presence_penalty: presencePenalty,
+      stop: ['</respuesta>', '\nUsuario:', '\nUser:']
     }),
     signal: abortSignal
   });
