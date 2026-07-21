@@ -56,7 +56,7 @@ export function getModel(tier, arquetipoId) {
   if (process.env.DEEPINFRA_API_KEY) {
     return tier === 'premium' || tier === 'obsesion'
       ? (process.env.PREMIUM_MODEL || 'meta-llama/Meta-Llama-3.1-70B-Instruct')
-      : (process.env.FREE_MODEL || 'nousresearch/hermes-3-llama-3.1-8b');
+      : (process.env.FREE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash');
   }
 
   if (process.env.GROQ_API_KEY) {
