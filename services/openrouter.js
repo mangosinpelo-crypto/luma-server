@@ -36,7 +36,8 @@ export async function streamChatCompletion(messages, model, abortSignal) {
       model,
       messages,
       stream: true,
-      temperature: 0.8
+      temperature: 0.8,
+      max_tokens: 150
     }),
     signal: abortSignal
   });
