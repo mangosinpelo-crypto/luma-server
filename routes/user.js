@@ -39,26 +39,15 @@ router.get('/me', async (req, res) => {
  */
 router.post('/reward', async (req, res) => {
   try {
-    const amount = Number(req.body.amount) || 5;
-    const rewardAmount = Math.min(Math.max(amount, 1), 10);
-
-    const { data: user } = await supabase
-      .from('users')
-      .select('daily_message_count')
-      .eq('id', req.userId)
-      .single();
-
-    const currentCount = user?.daily_message_count || 0;
-    const newCount = Math.max(0, currentCount - rewardAmount);
-
+    // Reset message count to 0 (grant full fresh daily quota) upon watching ad
     const { error } = await supabase
       .from('users')
-      .update({ daily_message_count: newCount })
+      .update({ daily_message_count: 0 })
       .eq('id', req.userId);
 
     if (error) throw error;
 
-    res.json({ ok: true, dailyMessageCount: newCount });
+    res.json({ ok: true, dailyMessageCount: 0 });
   } catch (err) {
     console.error('Reward POST error:', err);
     res.status(500).json({ error: 'Error al otorgar recompensa' });
