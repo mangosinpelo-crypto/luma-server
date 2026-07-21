@@ -50,10 +50,10 @@ export async function loadTier(req, res, next) {
       .single();
 
     if (error || !data) {
-      // User doesn't exist in users table yet, create with free tier
+      // User doesn't exist in users table yet, create with free tier and default mejorAmigo archetype
       const { error: insertError } = await supabase
         .from('users')
-        .insert({ id: req.userId, tier: 'free' });
+        .insert({ id: req.userId, tier: 'free', arquetipo_id: 'mejorAmigo' });
 
       if (insertError) console.error('Error creating user row:', insertError);
 
@@ -62,6 +62,18 @@ export async function loadTier(req, res, next) {
       req.dailyMessageCount = 0;
       req.dailyInternalCount = 0;
       return next();
+    }
+
+    req.tier = data.tier || 'free';
+    req.tierFeatures = TIER_FEATURES[req.tier] || TIER_FEATURES.free;
+
+    // Enforce archetype consistency for free tier in database
+    if (req.tier === 'free' && (!data.arquetipo_id || !isArchetypeAllowed('free', data.arquetipo_id))) {
+      await supabase
+        .from('users')
+        .update({ arquetipo_id: 'mejorAmigo' })
+        .eq('id', req.userId);
+      data.arquetipo_id = 'mejorAmigo';
     }
 
     // Reset daily counter if it's a new day
@@ -76,8 +88,6 @@ export async function loadTier(req, res, next) {
       data.daily_internal_count = 0;
     }
 
-    req.tier = data.tier || 'free';
-    req.tierFeatures = TIER_FEATURES[req.tier] || TIER_FEATURES.free;
     req.dailyMessageCount = data.daily_message_count || 0;
     req.dailyInternalCount = data.daily_internal_count || 0;
     next();
