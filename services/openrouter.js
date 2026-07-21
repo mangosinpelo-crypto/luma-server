@@ -57,7 +57,7 @@ export async function streamChatCompletion(messages, model, abortSignal, maxToke
  */
 export function getModel(tier, arquetipoId) {
   if (process.env.DEEPINFRA_API_KEY) {
-    return process.env.PREMIUM_MODEL || 'NousResearch/Hermes-3-Llama-3.1-70B';
+    return process.env.FREE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash';
   }
 
   if (process.env.GROQ_API_KEY) {
