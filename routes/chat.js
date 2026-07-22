@@ -48,15 +48,28 @@ router.post('/completions', async (req, res) => {
     }
 
     const model = getModel(req.tier, arquetipo_id);
-    console.log(`[CHAT] Model: ${model}, Tier: ${req.tier}, Archetype: ${arquetipo_id || 'default'}, Messages: ${messages.length}`);
+    const inputChars = messages.reduce((acc, m) => acc + (m.content ? m.content.length : 0), 0);
+    const estInputTokens = Math.round(inputChars / 3.8);
+    console.log(`[CHAT AUDIT] New Request | Model: ${model} | Tier: ${req.tier} | Archetype: ${arquetipo_id || 'default'} | Msg Count: ${messages.length} | Input Chars: ${inputChars} | Est Input Tokens: ~${estInputTokens}`);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000);
 
-    req.on('close', () => {
-      controller.abort();
+    res.on('close', () => {
+      if (!res.writableEnded) {
+        controller.abort();
+      }
       clearTimeout(timeout);
     });
+
+    // Set up SSE headers for streaming immediately so client gets 200 OK instantly
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof res.flushHeaders === 'function') {
+      res.flushHeaders();
+    }
 
     const openRouterRes = await streamChatCompletion(messages, model, controller.signal);
 
@@ -77,12 +90,6 @@ router.post('/completions', async (req, res) => {
       }
     }
 
-    // Set up SSE headers for streaming
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-
     if (!openRouterRes.body) {
       throw new Error('No stream body returned from AI provider');
     }
@@ -91,25 +98,28 @@ router.post('/completions', async (req, res) => {
     const reader = openRouterRes.body.getReader();
     const decoder = new TextDecoder();
 
-    let debugBuffer = '';
+    let fullStreamOutput = '';
     try {
       while (true) {
-        if (req.destroyed || res.writableEnded) {
+        if (res.destroyed || res.writableEnded) {
           controller.abort();
           break;
         }
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
-        if (debugBuffer.length < 500) debugBuffer += chunk;
+        fullStreamOutput += chunk;
         res.write(chunk);
+        if (typeof res.flush === 'function') res.flush();
       }
     } catch (streamErr) {
       if (streamErr.name !== 'AbortError') {
         console.error('Stream error:', streamErr);
       }
     } finally {
-      console.log(`[CHAT] Stream finished. First 500 chars:`, debugBuffer.substring(0, 500));
+      const outputChars = fullStreamOutput.length;
+      const estOutputTokens = Math.round(outputChars / 4.0);
+      console.log(`[CHAT AUDIT] Stream Finished | Turn Msgs: ${messages.length} | Output Chars: ${outputChars} | Est Output Tokens: ~${estOutputTokens} | Total Est Turn Tokens: ~${estInputTokens + estOutputTokens}`);
       clearTimeout(timeout);
       res.end();
     }
