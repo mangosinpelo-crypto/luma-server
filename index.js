@@ -12,6 +12,7 @@ import memoryRoutes from './routes/memory.js';
 import billingRoutes, { handleStripeWebhook } from './routes/billing.js';
 import userRoutes from './routes/user.js';
 import audioRoutes from './routes/audio.js';
+import characterRoutes from './routes/characters.js';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -84,6 +85,7 @@ app.use('/api/memory', requireAuth, loadTier, memoryRoutes);
 app.use('/api/billing', requireAuth, loadTier, billingRoutes);
 app.use('/api/user', requireAuth, loadTier, userRoutes);
 app.use('/api/audio', requireAuth, loadTier, audioRoutes);
+app.use('/api/characters', requireAuth, loadTier, characterRoutes);
 
 // Start server
 app.listen(PORT, () => {
