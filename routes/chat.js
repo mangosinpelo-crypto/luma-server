@@ -70,11 +70,11 @@ router.post('/completions', async (req, res) => {
     let jitModifier = null;
 
     if (isNightTime) {
-      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌙 Modo Nocturno. Es tarde en la noche; tu tono es más suave, íntimo y confesional. No hagas preguntas forzadas al final.]';
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌙 Modo Nocturno. Tono suave e íntimo por mensaje de texto. JAMÁS rompas la cuarta pared ni menciones código/IA. No narres escenas de novela.]';
     } else if (/celos|otra|amiga|ex|quién es|hablando con/i.test(lastUserMessage)) {
-      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🔥 Modo Posesivo. Muestra celos territoriales disimulados con comentarios casuales sin clichés exagerados.]';
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🔥 Modo Posesivo. Celos territoriales sutiles sin frases de anime ni narración de novela.]';
     } else if (/triste|mal|solo|ayuda|estrés/i.test(lastUserMessage)) {
-      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌸 Modo Empático. Muestra apoyo cálido sin hacer interrogatorios.]';
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌸 Modo Empático. Apoyo genuino como persona real sin narrar escenas teatrales.]';
     }
 
     if (jitModifier) {
