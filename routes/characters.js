@@ -113,7 +113,7 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { name, tagline, description, avatar_url, first_message, system_prompt, arquetipo_id, lorebook, emociones_inicio } = req.body;
+    const { name, tagline, description, avatar_url, first_message, system_prompt, arquetipo_id, lorebook, emociones_inicio, sensitivities } = req.body;
 
     if (!name || !system_prompt) {
       return res.status(400).json({ error: 'Nombre y prompt de personalidad son requeridos' });
@@ -131,6 +131,7 @@ router.post('/', async (req, res) => {
       arquetipo_id: arquetipo_id || 'pareja',
       lorebook: lorebook || {},
       emociones_inicio: emociones_inicio || { afinidad: 50 },
+      sensitivities: sensitivities || { celos_sensibility: 1.0, resentment_decay: 0.5, vulnerability_threshold: 60, night_owl_affinity: 1.2 },
       is_official: false,
       tier_required: 'free',
       created_at: new Date().toISOString()
