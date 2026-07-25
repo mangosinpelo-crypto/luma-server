@@ -45,7 +45,7 @@ router.post('/', async (req, res) => {
       'afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento',
       'resentimiento', 'celos', 'nostalgia', 'rasgos_identidad',
       'memory_state', 'ignored_count', 'arquetipo_id', 'dias_activos',
-      'chat_history'
+      'chat_history', 'sensitivities'
     ];
 
     const sanitized = {};

@@ -61,7 +61,28 @@ router.post('/completions', async (req, res) => {
     // Clamp max_tokens from client (min 100, max 500, default 150)
     const clampedMaxTokens = Math.min(500, Math.max(100, Number(max_tokens) || 150));
     const clampedTemp = Number(temperature) >= 0.1 && Number(temperature) <= 1.5 ? Number(temperature) : 0.8;
-    const clampedPresence = Number(presence_penalty) >= 0 && Number(presence_penalty) <= 1.5 ? Number(presence_penalty) : 0.3;
+    // ── Just-In-Time Micro-State Evaluator (Prompt Caching Friendly) ──
+    const lastUserMsgObj = messages.filter(m => m.role === 'user').slice(-1)[0];
+    const lastUserMessage = lastUserMsgObj ? lastUserMsgObj.content : '';
+    const nowHour = new Date().getHours();
+    const isNightTime = nowHour >= 23 || nowHour < 4;
+
+    let jitModifier = null;
+
+    if (isNightTime) {
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌙 Modo Nocturno. Es tarde en la noche; tu tono es más suave, íntimo y confesional.]';
+    } else if (/celos|otra|amiga|ex|quién es|hablando con/i.test(lastUserMessage)) {
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🔥 Modo Posesivo. Muestra celos territoriales disimulados.]';
+    } else if (/triste|mal|solo|ayuda|estrés/i.test(lastUserMessage)) {
+      jitModifier = '[JIT MICRO-ESTADO ACTIVO: 🌸 Modo Empático. Muestra apoyo cálido y atención incondicional.]';
+    }
+
+    if (jitModifier) {
+      const systemIndex = messages.findIndex(m => m.role === 'system');
+      if (systemIndex !== -1) {
+        messages[systemIndex].content += `\n\n${jitModifier}`;
+      }
+    }
 
     const openRouterRes = await streamChatCompletion(messages, model, controller.signal, clampedMaxTokens, clampedTemp, clampedPresence);
 
