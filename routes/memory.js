@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
+import { generateEmbedding, summarizeEpisodes } from '../services/openrouter.js';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.get('/', async (req, res) => {
 /**
  * POST /api/memory
  * Saves/updates the user's emotional state and memory.
+ * Enforces evolution feature limits for free tier.
  */
 router.post('/', async (req, res) => {
   try {
@@ -55,15 +57,25 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Validate numeric fields are within 0-100
-    const numericFields = ['afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento', 'resentimiento', 'celos', 'nostalgia'];
-    for (const field of numericFields) {
-      if (sanitized[field] !== undefined) {
-        const val = Number(sanitized[field]);
-        if (isNaN(val) || val < 0 || val > 100) {
-          return res.status(400).json({ error: `Campo ${field} debe ser un número entre 0 y 100` });
+    // Check tier evolution feature
+    const isEvolutionAllowed = req.tierFeatures && req.tierFeatures.evolution;
+    const emotionalFields = ['afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento', 'resentimiento', 'celos', 'nostalgia'];
+
+    if (!isEvolutionAllowed) {
+      // Free tier: ignore changes to emotional spectrum parameters
+      for (const field of emotionalFields) {
+        delete sanitized[field];
+      }
+    } else {
+      // Validate numeric fields are within 0-100 for tiers with evolution allowed
+      for (const field of emotionalFields) {
+        if (sanitized[field] !== undefined) {
+          const val = Number(sanitized[field]);
+          if (isNaN(val) || val < 0 || val > 100) {
+            return res.status(400).json({ error: `Campo ${field} debe ser un número entre 0 y 100` });
+          }
+          sanitized[field] = val;
         }
-        sanitized[field] = val;
       }
     }
 
@@ -98,7 +110,7 @@ router.post('/', async (req, res) => {
       .upsert(payload, { onConflict: 'user_id' });
 
     if (error) throw error;
-    res.json({ ok: true });
+    res.json({ ok: true, evolutionApplied: isEvolutionAllowed });
   } catch (err) {
     console.error('Memory POST error:', err);
     res.status(500).json({ error: 'Error al guardar memoria' });
@@ -121,22 +133,40 @@ router.delete('/', async (req, res) => {
 });
 
 /**
- * GET /api/memory/episodes?keywords=word1,word2
- * Searches episodes by keywords using Postgres ilike filters.
+ * GET /api/memory/episodes?keywords=word1,word2 or ?q=search_phrase
+ * Performs semantic vector search (via pgvector RPC with time-decay recency) with fallback to keyword ilike search.
  */
 router.get('/episodes', async (req, res) => {
   try {
-    const keywords = (req.query.keywords || '')
+    const queryStr = req.query.q || req.query.keywords || '';
+    const rawKeywords = queryStr
       .split(',')
       .map(k => k.replace(/[^\w\sñáéíóú]/gi, '').trim())
       .filter(k => k.length > 0);
 
-    if (keywords.length === 0) {
+    if (rawKeywords.length === 0) {
       return res.json([]);
     }
 
-    // Construct Supabase OR filter for Postgres search: text.ilike.%word1%,text.ilike.%word2%
-    const orCondition = keywords.map(k => `text.ilike.%${k}%`).join(',');
+    const searchPhrase = rawKeywords.join(' ');
+
+    // Attempt 1: Semantic Vector Search via generateEmbedding & match_episodes RPC (with time decay score)
+    const queryEmbedding = await generateEmbedding(searchPhrase);
+    if (queryEmbedding && Array.isArray(queryEmbedding)) {
+      const { data: vectorResults, error: rpcError } = await supabase.rpc('match_episodes', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.25,
+        match_count: 3,
+        p_user_id: req.userId
+      });
+
+      if (!rpcError && vectorResults && vectorResults.length > 0) {
+        return res.json(vectorResults.map(r => r.text));
+      }
+    }
+
+    // Attempt 2: Fallback to keyword ILIKE search in Postgres
+    const orCondition = rawKeywords.map(k => `text.ilike.%${k}%`).join(',');
 
     const { data, error } = await supabase
       .from('episodes')
@@ -157,31 +187,86 @@ router.get('/episodes', async (req, res) => {
 
 /**
  * POST /api/memory/episodes
- * Saves a new episode.
+ * Saves a new episode non-blockingly (returns HTTP 200 immediately, processes embedding & insertion asynchronously).
  */
 router.post('/episodes', async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'text requerido' });
 
-    const { error } = await supabase
-      .from('episodes')
-      .insert({ user_id: req.userId, text });
+    const userId = req.userId;
 
-    if (error) throw error;
-    
-    // Non-blocking cleanup of episodes older than 30 days
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    supabase.from('episodes')
-      .delete()
-      .eq('user_id', req.userId)
-      .lt('created_at', thirtyDaysAgo.toISOString())
-      .then(({ error: cleanupError }) => { 
-        if (cleanupError) console.error('Cleanup error:', cleanupError); 
-      });
+    // Instant HTTP 200 response to client (~10ms latency)
+    res.json({ ok: true, async: true });
 
-    res.json({ ok: true });
+    // Background asynchronous execution for embedding, DB save, and smart episode consolidation
+    setImmediate(async () => {
+      try {
+        const embedding = await generateEmbedding(text);
+        const insertPayload = { user_id: userId, text };
+        if (embedding) {
+          insertPayload.embedding = embedding;
+        }
+
+        const { error: insertError } = await supabase
+          .from('episodes')
+          .insert(insertPayload);
+
+        if (insertError) console.error('Async episode insert error:', insertError);
+
+        // Smart cleanup & condensation of episodes older than 30 days
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // Fetch old episodes before deletion to summarize them into long-term psychological memory
+        const { data: oldEpisodes } = await supabase
+          .from('episodes')
+          .select('text')
+          .eq('user_id', userId)
+          .lt('created_at', thirtyDaysAgo.toISOString());
+
+        if (oldEpisodes && oldEpisodes.length > 0) {
+          const oldTexts = oldEpisodes.map(e => e.text);
+          const summary = await summarizeEpisodes(oldTexts);
+
+          if (summary) {
+            // Append condensed summary to user's memory_state.perfil_psicologico
+            const { data: currentMemory } = await supabase
+              .from('memory_state')
+              .select('memory_state')
+              .eq('user_id', userId)
+              .single();
+
+            const existingState = currentMemory?.memory_state || {};
+            const existingProfile = existingState.perfil_psicologico || '';
+            const updatedProfile = existingProfile
+              ? `${existingProfile}\n- [Resumen Pasado]: ${summary}`
+              : `- [Resumen Pasado]: ${summary}`;
+
+            await supabase
+              .from('memory_state')
+              .upsert({
+                user_id: userId,
+                memory_state: {
+                  ...existingState,
+                  perfil_psicologico: updatedProfile
+                },
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'user_id' });
+
+          }
+
+          // Delete summarized old episodes
+          await supabase
+            .from('episodes')
+            .delete()
+            .eq('user_id', userId)
+            .lt('created_at', thirtyDaysAgo.toISOString());
+        }
+      } catch (bgError) {
+        console.error('Background episode processing error:', bgError);
+      }
+    });
   } catch (err) {
     console.error('Episode POST error:', err);
     res.status(500).json({ error: 'Error guardando episodio' });
@@ -189,3 +274,5 @@ router.post('/episodes', async (req, res) => {
 });
 
 export default router;
+
+

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { TIER_FEATURES } from '../middleware/tierCheck.js';
+import { userRateLimit } from '../middleware/security.js';
 
 const router = Router();
 
@@ -36,8 +37,9 @@ router.get('/me', async (req, res) => {
 /**
  * POST /api/user/reward
  * Decrements daily_message_count in Supabase upon watching a rewarded ad.
+ * Enforces maximum 2 ad reward redemptions per 24 hours per account.
  */
-router.post('/reward', async (req, res) => {
+router.post('/reward', userRateLimit(2, 86400000), async (req, res) => {
   try {
     // Reset message count to 0 (grant full fresh daily quota) upon watching ad
     const { error } = await supabase
@@ -55,3 +57,4 @@ router.post('/reward', async (req, res) => {
 });
 
 export default router;
+

@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Luma Server — Telemetría & Métricas de Tokens</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0d0f18 0%, #16192b 50%, #0a0c14 100%);
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-hover: rgba(255, 255, 255, 0.07);
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--accent-emerald);
+      padding: 0.4rem 0.8rem;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-emerald);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--accent-emerald);
+      animation: pulseAnim 2s infinite;
+    }
+
+    @keyframes pulseAnim {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .btn-refresh {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.6rem 1.2rem;
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-refresh:hover {
+      background: var(--card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* KPI Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .kpi-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .kpi-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.25rem;
+      background: linear-gradient(135deg, #ffffff, #d1d5db);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+
+    }
+
+    .kpi-subtext {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .icon-box {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+
+    /* Grid Sections */
+    .sections-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .sections-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .section-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .section-header {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tier Progress Bars */
+    .tier-item {
+      margin-bottom: 1.25rem;
+    }
+
+    .tier-info {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .tier-name {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .bar-bg {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Users Table */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 500;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-free { background: rgba(156, 163, 175, 0.15); color: #d1d5db; }
+    .badge-premium { background: rgba(139, 92, 246, 0.2); color: #c4b5fd; }
+    .badge-obsesion { background: rgba(244, 63, 94, 0.2); color: #fca5a5; }
+
+    .code-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo-icon">🌙</div>
+        <div>
+          <h1>Luma Telemetry</h1>
+          <div class="subtitle">Panel de Control de Tokens & Costos de IA</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="live-badge">
+          <div class="pulse"></div>
+          <span>Sincronización en Vivo</span>
+        </div>
+        <button class="btn-refresh" id="btnRefresh" onclick="loadTelemetry()">
+          🔄 Refrescar
+        </button>
+      </div>
+    </header>
+
+    <!-- KPI Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Gasto Estimado Total</span>
+          <div class="icon-box" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald);">💵</div>
+        </div>
+        <div class="kpi-value" id="kpiCost">$0.0000</div>
+        <div class="kpi-subtext" id="kpiAvgUser">Promedio/Usuario: $0.0000</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Tokens Procesados</span>
+          <div class="icon-box" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-purple);">⚡</div>
+        </div>
+        <div class="kpi-value" id="kpiTokens">0</div>
+        <div class="kpi-subtext" id="kpiInputOutput">In: 0 | Out: 0</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Total Interacciones / Chats</span>
+          <div class="icon-box" style="background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan);">💬</div>
+        </div>
+        <div class="kpi-value" id="kpiChats">0</div>
+        <div class="kpi-subtext" id="kpiAvgChat">Costo/Chat: $0.0000</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Usuarios Registrados</span>
+          <div class="icon-box" style="background: rgba(244, 63, 94, 0.15); color: var(--accent-rose);">👥</div>
+        </div>
+        <div class="kpi-value" id="kpiUsers">0</div>
+        <div class="kpi-subtext">Cuentas activas en Supabase</div>
+      </div>
+    </div>
+
+    <!-- Sections Grid -->
+    <div class="sections-grid">
+      <!-- Tier Distribution -->
+      <div class="section-card">
+        <div class="section-header">
+          <span>Consumo por Nivel (Tier)</span>
+        </div>
+        
+        <div class="tier-item">
+          <div class="tier-info">
+            <span class="tier-name"><span class="dot" style="background: #9ca3af;"></span> Free Tier</span>
+            <span id="tierFreeCost" class="code-font">$0.00 (0 msgs)</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="barFree" style="width: 0%; background: #9ca3af;"></div></div>
+        </div>
+
+        <div class="tier-item">
+          <div class="tier-info">
+            <span class="tier-name"><span class="dot" style="background: var(--accent-purple);"></span> Premium Tier</span>
+            <span id="tierPremiumCost" class="code-font">$0.00 (0 msgs)</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="barPremium" style="width: 0%; background: var(--accent-purple);"></div></div>
+        </div>
+
+        <div class="tier-item">
+          <div class="tier-info">
+            <span class="tier-name"><span class="dot" style="background: var(--accent-rose);"></span> Obsesión Tier</span>
+            <span id="tierObsesionCost" class="code-font">$0.00 (0 msgs)</span>
+          </div>
+          <div class="bar-bg"><div class="bar-fill" id="barObsesion" style="width: 0%; background: var(--accent-rose);"></div></div>
+        </div>
+      </div>
+
+      <!-- Top Consumer Users -->
+      <div class="section-card">
+        <div class="section-header">
+          <span>Usuarios con Mayor Consumo</span>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario ID</th>
+                <th>Tier</th>
+                <th>Chats</th>
+                <th>Tokens In/Out</th>
+                <th>Gasto USD</th>
+              </tr>
+            </thead>
+            <tbody id="topUsersBody">
+              <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Cargando usuarios...</td></tr>
+            </tbody>
+          </table>
+         <!-- Security Threat Monitor Section -->
+    <div class="section-card" style="margin-top: 2.5rem;">
+      <div class="section-header">
+        <span style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent-rose);">
+          🛡️ Monitor de Amenazas e Incidentes de Seguridad en Tiempo Real
+        </span>
+        <span id="secSummaryBadge" class="badge" style="background: rgba(244, 63, 94, 0.2); color: #fca5a5;">0 Amenazas Bloqueadas</span>
+      </div>
+
+      <!-- Threat KPIs -->
+      <div class="kpi-grid" style="margin-bottom: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        <div class="kpi-card" style="padding: 1rem;">
+          <div class="kpi-title"><span>Total Bloqueados</span><span>🛡️</span></div>
+          <div class="kpi-value" id="secTotalCount" style="font-size: 1.6rem;">0</div>
+        </div>
+        <div class="kpi-card" style="padding: 1rem;">
+          <div class="kpi-title"><span>Prompt Injections</span><span>⚠️</span></div>
+          <div class="kpi-value" id="secInjectionCount" style="font-size: 1.6rem; color: var(--accent-rose);">0</div>
+        </div>
+        <div class="kpi-card" style="padding: 1rem;">
+          <div class="kpi-title"><span>Intentos XSS</span><span>🛑</span></div>
+          <div class="kpi-value" id="secXssCount" style="font-size: 1.6rem; color: var(--accent-purple);">0</div>
+        </div>
+        <div class="kpi-card" style="padding: 1rem;">
+          <div class="kpi-title"><span>Lista Negra Activa</span><span>🔒</span></div>
+          <div class="kpi-value" id="secActiveBansCount" style="font-size: 1.6rem; color: var(--accent-cyan);">0</div>
+        </div>
+      </div>
+
+      <!-- Live Security Log Table -->
+      <div class="table-container">
+        <table id="secEventsTable">
+          <thead>
+            <tr>
+              <th>Fecha / Hora</th>
+              <th>Tipo de Ataque</th>
+              <th>IP / Usuario ID</th>
+              <th>Fragmento de Texto Bloqueado</th>
+              <th>Trace ID</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="secEventsBody">
+            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Cargando incidentes de seguridad...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function getAdminKey() {
+      let key = localStorage.getItem('luma_admin_key');
+      if (!key) {
+        key = prompt('Por favor ingresa la clave administrativa de Luma Server (ADMIN_KEY):');
+        if (key) localStorage.setItem('luma_admin_key', key);
+      }
+      return key || '';
+    }
+
+    async function loadTelemetry() {
+      try {
+        const adminKey = getAdminKey();
+        const headers = { 'X-Admin-Key': adminKey };
+
+        const [summaryRes, topUsersRes, secRes] = await Promise.all([
+          fetch('/api/telemetry/summary', { headers }),
+          fetch('/api/telemetry/top-users', { headers }),
+          fetch('/api/telemetry/security-events', { headers })
+        ]);
+
+        if (summaryRes.status === 401 || topUsersRes.status === 401 || secRes.status === 401) {
+          localStorage.removeItem('luma_admin_key');
+          alert('Clave administrativa inválida o expirada.');
+          return;
+        }
+
+        if (!summaryRes.ok) throw new Error('Error al cargar resumen');
+        const summary = await summaryRes.json();
+        const topUsers = await topUsersRes.json();
+        const security = secRes.ok ? await secRes.json() : null;
+
+        // Update KPIs
+        document.getElementById('kpiCost').innerText = `$${summary.totalEstimatedCostUSD.toFixed(4)}`;
+        document.getElementById('kpiAvgUser').innerText = `Promedio/Usuario: $${summary.avgCostPerUser.toFixed(4)}`;
+        document.getElementById('kpiTokens').innerText = summary.totalTokens.toLocaleString();
+        document.getElementById('kpiInputOutput').innerText = `In: ${summary.totalInputTokens.toLocaleString()} | Out: ${summary.totalOutputTokens.toLocaleString()}`;
+        document.getElementById('kpiChats').innerText = summary.totalChats.toLocaleString();
+        document.getElementById('kpiAvgChat').innerText = `Costo/Chat: $${summary.avgCostPerChat.toFixed(6)}`;
+        document.getElementById('kpiUsers').innerText = summary.totalUsers.toLocaleString();
+
+        // Update Tier Distribution
+        const freeCost = summary.tierBreakdown.free.costUSD || 0;
+        const premCost = summary.tierBreakdown.premium.costUSD || 0;
+        const obsCost = summary.tierBreakdown.obsesion.costUSD || 0;
+        const maxCost = Math.max(freeCost, premCost, obsCost, 0.0001);
+
+        document.getElementById('tierFreeCost').innerText = `$${freeCost.toFixed(4)} (${summary.tierBreakdown.free.count} usuarios)`;
+        document.getElementById('barFree').style.width = `${(freeCost / maxCost) * 100}%`;
+
+        document.getElementById('tierPremiumCost').innerText = `$${premCost.toFixed(4)} (${summary.tierBreakdown.premium.count} usuarios)`;
+        document.getElementById('barPremium').style.width = `${(premCost / maxCost) * 100}%`;
+
+        document.getElementById('tierObsesionCost').innerText = `$${obsCost.toFixed(4)} (${summary.tierBreakdown.obsesion.count} usuarios)`;
+        document.getElementById('barObsesion').style.width = `${(obsCost / maxCost) * 100}%`;
+
+        // Render Top Users Table
+        const tbody = document.getElementById('topUsersBody');
+        if (!topUsers || topUsers.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Sin datos de uso registrados aún.</td></tr>`;
+        } else {
+          tbody.innerHTML = topUsers.map(u => {
+            const shortId = u.id ? `${u.id.substring(0, 8)}...` : 'Anon';
+            const tier = u.tier || 'free';
+            const input = (Number(u.total_input_tokens) || 0).toLocaleString();
+            const output = (Number(u.total_output_tokens) || 0).toLocaleString();
+            const cost = (Number(u.estimated_cost_usd) || 0).toFixed(4);
+            const chats = (Number(u.total_chats_count) || 0);
+
+            return `
+              <tr>
+                <td class="code-font" title="${u.id}">${shortId}</td>
+                <td><span class="badge badge-${tier}">${tier}</span></td>
+                <td>${chats}</td>
+                <td class="code-font">${input} / ${output}</td>
+                <td class="code-font" style="color: var(--accent-emerald); font-weight: 600;">$${cost}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Render Security Threat Monitor Data
+        if (security) {
+          document.getElementById('secTotalCount').innerText = security.totalEventsCount;
+          document.getElementById('secInjectionCount').innerText = security.breakdown.promptInjection;
+          document.getElementById('secXssCount').innerText = security.breakdown.xss;
+          document.getElementById('secActiveBansCount').innerText = security.activeBansCount;
+          document.getElementById('secSummaryBadge').innerText = `${security.totalEventsCount} Incidentes Neutralizados`;
+
+          const secBody = document.getElementById('secEventsBody');
+          if (!security.recentEvents || security.recentEvents.length === 0) {
+            secBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--accent-emerald);">🟢 Sin incidentes de seguridad detectados. Sistema 100% Blindado.</td></tr>`;
+          } else {
+            secBody.innerHTML = security.recentEvents.map(e => {
+              const timeStr = new Date(e.timestamp).toLocaleTimeString();
+              const snippet = e.snippet ? (e.snippet.length > 50 ? `${e.snippet.substring(0, 50)}...` : e.snippet) : 'N/A';
+              let badgeStyle = 'background: rgba(244, 63, 94, 0.2); color: #fca5a5;';
+              if (e.type === 'XSS_ATTACK') badgeStyle = 'background: rgba(139, 92, 246, 0.2); color: #c4b5fd;';
+              if (e.type === 'BEHAVIORAL_BAN') badgeStyle = 'background: rgba(6, 182, 212, 0.2); color: #67e8f9;';
+
+              return `
+                <tr>
+                  <td class="code-font" style="font-size: 0.8rem;">${timeStr}</td>
+                  <td><span class="badge" style="${badgeStyle}">${e.type}</span></td>
+                  <td class="code-font" style="font-size: 0.8rem;">${e.target}</td>
+                  <td style="font-size: 0.8rem; color: #d1d5db;" title="${e.snippet}">${snippet}</td>
+                  <td class="code-font" style="font-size: 0.75rem; color: var(--text-muted);">${e.traceId ? e.traceId.substring(0, 8) : 'N/A'}</td>
+                  <td><span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7;">BLOQUEADO</span></td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Error visualizando telemetría:', err);
+      }
+    }
+
+    // Auto refresh every 10 seconds
+    setInterval(loadTelemetry, 10000);
+    loadTelemetry();
+  </script>
+</body>
+</html>
+
