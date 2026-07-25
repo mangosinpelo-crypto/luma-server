@@ -78,7 +78,7 @@ router.post('/', async (req, res) => {
 
     // Validate arquetipo_id
     const VALID_ARQUETIPOS = ['pareja', 'amigaToxica', 'rival', 'ex', 'mejorAmigo'];
-    if (sanitized.arquetipo_id && !VALID_ARQUETIPOS.includes(sanitized.arquetipo_id)) {
+    if (sanitized.arquetipo_id && !VALID_ARQUETIPOS.includes(sanitized.arquetipo_id) && !sanitized.arquetipo_id.startsWith('custom_') && !sanitized.arquetipo_id.startsWith('imported_')) {
       return res.status(400).json({ error: 'arquetipo_id inválido' });
     }
 

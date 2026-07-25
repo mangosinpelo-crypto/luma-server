@@ -3,13 +3,13 @@ import supabase from '../services/supabase.js';
 // Feature definitions per tier
 const TIER_FEATURES = {
   free: {
-    maxMessagesPerDay: 10,
-    maxInternalPerDay: 10,
-    arquetipos: ['mejorAmigo'],
+    maxMessagesPerDay: 15,
+    maxInternalPerDay: 15,
+    arquetipos: ['pareja', 'rival', 'amigaToxica', 'mejorAmigo'],
     autonomousMessages: false,
     evolution: false,
-    multipleCharacters: false,
-    customArchetype: false,
+    multipleCharacters: true,
+    customArchetype: true,
     realLifeMode: false,
     exportHistory: false
   },
@@ -19,8 +19,8 @@ const TIER_FEATURES = {
     arquetipos: ['pareja', 'amigaToxica', 'rival', 'ex', 'mejorAmigo'],
     autonomousMessages: true,
     evolution: true,
-    multipleCharacters: false,
-    customArchetype: false,
+    multipleCharacters: true,
+    customArchetype: true,
     realLifeMode: false,
     exportHistory: false
   },
@@ -120,6 +120,7 @@ export function requireFeature(featureName) {
 
 export function isArchetypeAllowed(tier, arquetipoId) {
   if (!arquetipoId) return true; // fallback to default archetype if unspecified
+  if (typeof arquetipoId === 'string' && (arquetipoId.startsWith('custom_') || arquetipoId.startsWith('imported_'))) return true;
   const features = TIER_FEATURES[tier] || TIER_FEATURES.free;
   return Array.isArray(features.arquetipos) && features.arquetipos.includes(arquetipoId);
 }
