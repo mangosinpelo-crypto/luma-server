@@ -42,6 +42,9 @@ const TIER_FEATURES = {
  * Must be used AFTER requireAuth.
  */
 export async function loadTier(req, res, next) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
   try {
     const { data, error } = await supabase
       .from('users')

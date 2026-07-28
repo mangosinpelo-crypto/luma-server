@@ -24,17 +24,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS
+// CORS Configuration
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'https://melora-ai.com',
+  'https://www.melora-ai.com',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || origin.endsWith('.workers.dev')) {
+    if (allowedOrigins.includes(origin) || origin.endsWith('.workers.dev') || origin.endsWith('melora-ai.com') || origin.includes('melora-ai.com')) {
       return callback(null, true);
     }
     if (process.env.FRONTEND_URL && origin.includes(process.env.FRONTEND_URL.replace('https://', '').replace('http://', ''))) {
@@ -42,8 +44,14 @@ app.use(cors({
     }
     return callback(null, false);
   },
-  credentials: true
-}));
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Stripe webhook needs raw body — must be BEFORE json parser
 app.post('/api/billing/webhook',
@@ -76,7 +84,7 @@ app.use('/api/chat', chatLimiter);
 
 // Health check (no auth required)
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', name: 'Luma API', version: '1.0.0' });
+  res.json({ status: 'ok', name: 'Melora API', version: '1.0.0' });
 });
 
 // All other API routes require auth + tier loading
@@ -89,7 +97,7 @@ app.use('/api/characters', requireAuth, loadTier, characterRoutes);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🌙 Luma API running on http://localhost:${PORT}`);
+  console.log(`🌙 Melora API running on http://localhost:${PORT}`);
   console.log(`   Free model:    ${process.env.FREE_MODEL || 'google/gemma-2-9b-it:free'}`);
   console.log(`   Premium model: ${process.env.PREMIUM_MODEL || 'google/gemma-2-9b-it:free'}`);
 });

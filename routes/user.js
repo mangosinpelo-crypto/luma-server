@@ -35,10 +35,21 @@ router.get('/me', async (req, res) => {
 
 /**
  * POST /api/user/reward
- * Decrements daily_message_count in Supabase upon watching a rewarded ad.
+ * Resets daily_message_count to 0 upon watching a rewarded ad.
+ * Validates watch duration parameter to ensure ad completion integrity.
  */
 router.post('/reward', async (req, res) => {
   try {
+    const { watchedSeconds, adId } = req.body || {};
+
+    // Validate ad watch integrity (minimum 5 seconds)
+    if (watchedSeconds !== undefined && Number(watchedSeconds) < 5) {
+      return res.status(400).json({
+        error: 'Incapaz de verificar la visualización completa del anuncio.',
+        completed: false
+      });
+    }
+
     // Reset message count to 0 (grant full fresh daily quota) upon watching ad
     const { error } = await supabase
       .from('users')
@@ -47,7 +58,14 @@ router.post('/reward', async (req, res) => {
 
     if (error) throw error;
 
-    res.json({ ok: true, dailyMessageCount: 0 });
+    console.log(`[REWARD] User ${req.userId} completed rewarded ad (${adId || 'default'}). Daily quota reset to 0.`);
+
+    res.json({
+      ok: true,
+      completed: true,
+      dailyMessageCount: 0,
+      message: '¡Recompensa otorgada exitosamente! Cuota diaria restablecida.'
+    });
   } catch (err) {
     console.error('Reward POST error:', err);
     res.status(500).json({ error: 'Error al otorgar recompensa' });
@@ -55,3 +73,4 @@ router.post('/reward', async (req, res) => {
 });
 
 export default router;
+

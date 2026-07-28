@@ -5,6 +5,10 @@ import supabase from '../services/supabase.js';
  * Attaches req.userId and req.userEmail on success.
  */
 export async function requireAuth(req, res, next) {
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token requerido' });
