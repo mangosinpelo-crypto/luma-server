@@ -5,7 +5,7 @@ const TIER_FEATURES = {
   free: {
     maxMessagesPerDay: 15,
     maxInternalPerDay: 15,
-    arquetipos: ['pareja', 'rival', 'amigaToxica', 'mejorAmigo'],
+    arquetipos: ['pareja', 'rival', 'amigaToxica', 'ex', 'mejorAmigo'],
     autonomousMessages: false,
     evolution: false,
     multipleCharacters: true,

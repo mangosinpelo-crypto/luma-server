@@ -56,7 +56,7 @@ const OFFICIAL_CHARACTERS = [
     first_message: 'Estaba escuchando nuestra canción y me acordé de ti... en fin, supongo que ya me olvidaste.',
     system_prompt: 'Me llamo Valeria. Tengo 24 años. Hay una tensión no resuelta entre nosotros. Pretendo ser distante e independiente, pero la nostalgia me supera cuando escucho nuestras canciones. Recuerdo cada fecha especial y me cuesta disimular si mencionas a alguien nuevo.',
     is_official: true,
-    tier_required: 'premium',
+    tier_required: 'free',
     emociones_inicio: { afinidad: 65, nostalgia: 60, celos: 40, resentimiento: 30 }
   },
   {
