@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -13,15 +16,42 @@ import billingRoutes, { handleStripeWebhook } from './routes/billing.js';
 import userRoutes from './routes/user.js';
 import audioRoutes from './routes/audio.js';
 import characterRoutes from './routes/characters.js';
+import telemetryRoutes from './routes/telemetry.js';
+import { requireAdmin, requireAdminIP } from './middleware/security.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3001;
 
-// Request Logger
+// Trace ID & HTTP Security Headers
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  const traceId = req.headers['x-request-id'] || crypto.randomUUID();
+  req.traceId = traceId;
+  res.setHeader('X-Request-ID', traceId);
+
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   next();
+});
+
+// Request Logger with Trace ID
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] [Trace: ${req.traceId}] ${req.method} ${req.url}`);
+  next();
+});
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Web Dashboard route (Gated by IP Whitelist + UI prompts for X-Admin-Key)
+app.get('/dashboard', requireAdminIP, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
 // CORS Configuration
@@ -82,12 +112,30 @@ const chatLimiter = rateLimit({
 });
 app.use('/api/chat', chatLimiter);
 
-// Health check (no auth required)
+// Health check & Telemetry (Public / Administrative)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', name: 'Melora API', version: '1.0.0' });
 });
+app.use('/api/telemetry', telemetryRoutes);
 
-// All other API routes require auth + tier loading
+// Root API Welcome Response
+app.get('/', (req, res) => {
+  res.json({
+    name: 'Melora AI Backend API',
+    version: '1.0.0',
+    status: 'online',
+    documentation: {
+      health: 'GET /api/health',
+      chat: 'POST /api/chat/completions',
+      characters: 'GET /api/characters',
+      memory: 'GET/POST /api/memory',
+      user: 'GET /api/user/me',
+      dashboard: 'GET /dashboard'
+    }
+  });
+});
+
+// All API routes
 app.use('/api/chat', requireAuth, loadTier, chatRoutes);
 app.use('/api/memory', requireAuth, loadTier, memoryRoutes);
 app.use('/api/billing', requireAuth, loadTier, billingRoutes);
@@ -98,6 +146,7 @@ app.use('/api/characters', requireAuth, loadTier, characterRoutes);
 // Start server
 app.listen(PORT, () => {
   console.log(`🌙 Melora API running on http://localhost:${PORT}`);
+  console.log(`📊 Telemetry Dashboard available on http://localhost:${PORT}/dashboard`);
   console.log(`   Free model:    ${process.env.FREE_MODEL || 'google/gemma-2-9b-it:free'}`);
   console.log(`   Premium model: ${process.env.PREMIUM_MODEL || 'google/gemma-2-9b-it:free'}`);
 });

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
+import { requireAuth } from '../middleware/auth.js';
+import { loadTier } from '../middleware/tierCheck.js';
 
 const router = Router();
 
@@ -80,8 +82,7 @@ router.get('/', async (req, res) => {
   try {
     let customCharacters = [];
 
-    // Try fetching from Supabase if table exists
-    if (supabase) {
+    if (supabase && req.userId) {
       const { data, error } = await supabase
         .from('characters')
         .select('*')
@@ -119,28 +120,27 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Nombre y prompt de personalidad son requeridos' });
     }
 
-    const newChar = {
-      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      user_id: req.userId,
+    const newCharacter = {
+      id: `custom_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      user_id: req.userId || 'local_user',
       name,
-      tagline: tagline || 'Personaje Personalizado',
-      description: description || tagline || 'Creado en Luma AI',
+      tagline: tagline || '',
+      description: description || '',
       avatar_url: avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-      first_message: first_message || '¡Hola! Me alegra hablar contigo.',
+      first_message: first_message || '¡Hola!',
       system_prompt,
       arquetipo_id: arquetipo_id || 'pareja',
-      lorebook: lorebook || {},
+      lorebook: lorebook || [],
       emociones_inicio: emociones_inicio || { afinidad: 50 },
-      sensitivities: sensitivities || { celos_sensibility: 1.0, resentment_decay: 0.5, vulnerability_threshold: 60, night_owl_affinity: 1.2 },
+      sensitivities: sensitivities || [],
       is_official: false,
-      tier_required: 'free',
       created_at: new Date().toISOString()
     };
 
-    if (supabase) {
+    if (supabase && req.userId) {
       const { data, error } = await supabase
         .from('characters')
-        .insert([newChar])
+        .insert(newCharacter)
         .select()
         .single();
 
@@ -149,8 +149,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Return generated object if database table is not present
-    res.json(newChar);
+    res.json(newCharacter);
   } catch (error) {
     console.error('Error creating character:', error);
     res.status(500).json({ error: 'Error al crear personaje' });
@@ -164,7 +163,7 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    if (supabase) {
+    if (supabase && req.userId) {
       await supabase
         .from('characters')
         .delete()

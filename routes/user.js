@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../services/supabase.js';
 import { TIER_FEATURES } from '../middleware/tierCheck.js';
+import { userRateLimit } from '../middleware/security.js';
 
 const router = Router();
 
@@ -38,7 +39,7 @@ router.get('/me', async (req, res) => {
  * Resets daily_message_count to 0 upon watching a rewarded ad.
  * Validates watch duration parameter to ensure ad completion integrity.
  */
-router.post('/reward', async (req, res) => {
+router.post('/reward', userRateLimit(2, 86400000), async (req, res) => {
   try {
     const { watchedSeconds, adId } = req.body || {};
 
