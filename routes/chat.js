@@ -3,6 +3,7 @@ import { streamChatCompletion, getModel } from '../services/openrouter.js';
 import supabase from '../services/supabase.js';
 import { isArchetypeAllowed } from '../middleware/tierCheck.js';
 import { promptShield, userRateLimit, outputLeakageGuard, payloadSecurityMiddleware } from '../middleware/security.js';
+import { getCanonicalSystemPrompt } from '../services/serverPrompts.js';
 
 const router = Router();
 
@@ -20,6 +21,13 @@ router.post('/completions', userRateLimit(20, 60000), payloadSecurityMiddleware,
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array requerido' });
     }
+
+    // 🔒 Security Enforcement: Overwrite system prompt using canonical server prompt
+    const rawClientSystem = messages[0]?.role === 'system' ? messages[0].content : '';
+    const canonicalPrompt = getCanonicalSystemPrompt(arquetipo_id, rawClientSystem);
+
+    let sanitizedMessages = messages.filter(m => m && m.role !== 'system');
+    sanitizedMessages.unshift({ role: 'system', content: canonicalPrompt });
 
     // Verify archetype authorization for user's tier
     if (arquetipo_id && !isArchetypeAllowed(req.tier, arquetipo_id)) {
@@ -51,11 +59,11 @@ router.post('/completions', userRateLimit(20, 60000), payloadSecurityMiddleware,
     }
 
     // 1. Sliding Window Context Pruning (Keep system message + last 8 turns to save up to 70% input tokens)
-    let prunedMessages = messages;
-    if (messages.length > 9) {
-      const systemMessage = messages[0]?.role === 'system' ? messages[0] : null;
-      const recentMessages = messages.slice(-8);
-      prunedMessages = systemMessage ? [systemMessage, ...recentMessages] : recentMessages;
+    let prunedMessages = sanitizedMessages;
+    if (sanitizedMessages.length > 9) {
+      const systemMessage = sanitizedMessages[0];
+      const recentMessages = sanitizedMessages.slice(-8);
+      prunedMessages = [systemMessage, ...recentMessages];
     }
 
     // 2. Dynamic Max Tokens per Tier
