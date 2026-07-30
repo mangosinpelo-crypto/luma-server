@@ -248,7 +248,11 @@ export function outputLeakageGuard(outputContent) {
   const LEAK_PATTERNS = [
     /(DEEPINFRA_API_KEY|OPENROUTER_API_KEY|SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY)/gi,
     /(sb_secret_|sk_live_|sk_test_|whsec_)[A-Za-z0-9_-]{10,}/gi,
-    /\[SYSTEM PROMPT\]|\[INSTRUCCIONES DE SISTEMA\]/gi
+    /\[SYSTEM PROMPT\]|\[INSTRUCCIONES DE SISTEMA\]/gi,
+    /\[INMERSIÓN Y ESTILO HUMANO INVIOLABLE/gi,
+    /\[FORMATO DE RESPUESTA REQUERIDO/gi,
+    /\[INSTRUCCIÓN DE DIARIO DE PENSAMIENTOS/gi,
+    /\[JIT MICRO-ESTADO ACTIVO/gi
   ];
 
   let cleaned = outputContent;
@@ -352,6 +356,37 @@ export function requireAdminIP(req, res, next) {
 
   next();
 }
+
+/**
+ * Payload Encryption & Obfuscation Envelope Security
+ */
+const LUMA_SECRET_KEY = 'LUMA_SEC_PAYLOAD_2026';
+
+export function unscramblePayload(scrambledStr) {
+  try {
+    const decoded = decodeURIComponent(escape(atob(scrambledStr)));
+    let jsonStr = '';
+    for (let i = 0; i < decoded.length; i++) {
+      const charCode = decoded.charCodeAt(i) ^ LUMA_SECRET_KEY.charCodeAt(i % LUMA_SECRET_KEY.length);
+      jsonStr += String.fromCharCode(charCode);
+    }
+    return JSON.parse(jsonStr);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function payloadSecurityMiddleware(req, res, next) {
+  if (req.body && req.body._payload) {
+    const decrypted = unscramblePayload(req.body._payload);
+    if (decrypted) {
+      req.body = { ...req.body, ...decrypted };
+      delete req.body._payload;
+    }
+  }
+  next();
+}
+
 
 
 

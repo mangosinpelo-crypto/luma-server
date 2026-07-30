@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { streamChatCompletion, getModel } from '../services/openrouter.js';
 import supabase from '../services/supabase.js';
 import { isArchetypeAllowed } from '../middleware/tierCheck.js';
-import { promptShield, userRateLimit, outputLeakageGuard } from '../middleware/security.js';
+import { promptShield, userRateLimit, outputLeakageGuard, payloadSecurityMiddleware } from '../middleware/security.js';
 
 const router = Router();
 
@@ -11,7 +11,7 @@ const router = Router();
  * POST /api/chat/completions
  * Proxies chat to AI providers with prompt injection shielding, account rate limits, and daily limits.
  */
-router.post('/completions', userRateLimit(20, 60000), promptShield, async (req, res) => {
+router.post('/completions', userRateLimit(20, 60000), payloadSecurityMiddleware, promptShield, async (req, res) => {
 
 
   try {
