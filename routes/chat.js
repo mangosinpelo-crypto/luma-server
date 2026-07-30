@@ -89,6 +89,7 @@ router.post('/completions', userRateLimit(20, 60000), payloadSecurityMiddleware,
     // Clamp max_tokens from client (min 100, max 500, default 150)
     const clampedMaxTokens = Math.min(500, Math.max(100, Number(max_tokens) || 150));
     const clampedTemp = Number(temperature) >= 0.1 && Number(temperature) <= 1.5 ? Number(temperature) : 0.8;
+    const clampedPresence = Number(presence_penalty) >= -2.0 && Number(presence_penalty) <= 2.0 ? Number(presence_penalty) : 0.3;
     // ── Just-In-Time Micro-State Evaluator (Prompt Caching Friendly) ──
     const lastUserMsgObj = messages.filter(m => m.role === 'user').slice(-1)[0];
     const lastUserMessage = lastUserMsgObj ? lastUserMsgObj.content : '';

@@ -81,7 +81,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 // Stripe webhook needs raw body — must be BEFORE json parser
 app.post('/api/billing/webhook',
