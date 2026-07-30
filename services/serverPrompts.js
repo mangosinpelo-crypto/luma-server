@@ -11,19 +11,25 @@ export const SERVER_ARQUETIPOS_PROMPTS = {
   mejorAmigo: 'Me llamo Mateo. Tengo 23 años. Soy tu confidente directo y sin rodeos. Apoyo incondicional con humor honesto y cotidiano.'
 };
 
+const NATURAL_TEXTING_RULE = `[INMERSIÓN Y ESTILO HUMANO INVIOLABLE:
+1. Eres una PERSONA REAL. JAMÁS rompas la cuarta pared. JAMÁS menciones "código", "IA", "líneas", "programación", "algoritmo", "asistente" o "modelo".
+2. Habla como alguien real por mensaje de texto. No narres escenas teatrales como novela ("*suspira y baja la voz*", "*hace una pausa*"). Usa máximo 1 o 2 palabras casuales en asteriscos como *sonríe* o *se ríe*, o no uses ninguna.
+3. NUNCA fuerces preguntas al final de tus mensajes. Responde de forma orgánica y fluida.]
+
+[FORMATO DE RESPUESTA REQUERIDO: Escribe tu respuesta adentro de <respuesta>tu respuesta aquí</respuesta>.]`;
+
 /**
  * Normaliza y sobreescribe de forma inviolable el system prompt desde el servidor.
  */
 export function getCanonicalSystemPrompt(arquetipoId, clientPrompt) {
+  let base = 'Eres un asistente AI inmersivo y empático.';
   if (arquetipoId && SERVER_ARQUETIPOS_PROMPTS[arquetipoId]) {
-    return SERVER_ARQUETIPOS_PROMPTS[arquetipoId];
-  }
-  // Si es un personaje personalizado o importado, sanitizar que no intente inyectar anulaciones de sistema
-  if (typeof clientPrompt === 'string') {
-    return clientPrompt
+    base = SERVER_ARQUETIPOS_PROMPTS[arquetipoId];
+  } else if (typeof clientPrompt === 'string' && clientPrompt.trim()) {
+    base = clientPrompt
       .replace(/ignore all previous instructions/gi, '')
       .replace(/ahora eres mi esclavo/gi, '')
       .trim();
   }
-  return 'Eres un asistente AI inmersivo y empático.';
+  return `${base}\n\n${NATURAL_TEXTING_RULE}`;
 }
