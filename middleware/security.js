@@ -360,25 +360,41 @@ export function requireAdminIP(req, res, next) {
 /**
  * Payload Encryption & Obfuscation Envelope Security
  */
-const LUMA_SECRET_KEY = 'LUMA_SEC_PAYLOAD_2026';
+function deriveDynamicKey(token, offset = 0) {
+  const BASE_SECRET = 'LUMA_SEC_PAYLOAD_2026';
+  const userContext = token ? token.slice(-12) : 'anon_user';
+  const timeSlot = Math.floor(Date.now() / 300000) + offset;
+  return `${BASE_SECRET}_${userContext}_${timeSlot}`;
+}
 
-export function unscramblePayload(scrambledStr) {
-  try {
-    const decoded = decodeURIComponent(escape(atob(scrambledStr)));
-    let jsonStr = '';
-    for (let i = 0; i < decoded.length; i++) {
-      const charCode = decoded.charCodeAt(i) ^ LUMA_SECRET_KEY.charCodeAt(i % LUMA_SECRET_KEY.length);
-      jsonStr += String.fromCharCode(charCode);
-    }
-    return JSON.parse(jsonStr);
-  } catch (e) {
-    return null;
+export function unscramblePayload(scrambledStr, req) {
+  if (!scrambledStr) return null;
+  const authHeader = req ? (req.headers['authorization'] || req.headers['Authorization']) : null;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+  const offsets = [0, -1, 1];
+  for (const offset of offsets) {
+    try {
+      const candidateKey = deriveDynamicKey(token, offset);
+      const decoded = atob(scrambledStr);
+      let jsonBytes = '';
+      for (let i = 0; i < decoded.length; i++) {
+        const charCode = decoded.charCodeAt(i) ^ candidateKey.charCodeAt(i % candidateKey.length);
+        jsonBytes += String.fromCharCode(charCode);
+      }
+      const jsonStr = decodeURIComponent(escape(jsonBytes));
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch (e) {}
   }
+  return null;
 }
 
 export function payloadSecurityMiddleware(req, res, next) {
   if (req.body && req.body._payload) {
-    const decrypted = unscramblePayload(req.body._payload);
+    const decrypted = unscramblePayload(req.body._payload, req);
     if (decrypted) {
       req.body = { ...req.body, ...decrypted };
       delete req.body._payload;
