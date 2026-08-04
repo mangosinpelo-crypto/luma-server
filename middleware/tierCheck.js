@@ -48,15 +48,15 @@ export async function loadTier(req, res, next) {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('tier, daily_message_count, daily_internal_count, daily_message_reset')
+      .select('tier, daily_message_count, daily_internal_count, daily_message_reset, arquetipo_id')
       .eq('id', req.userId)
       .single();
 
     if (error || !data) {
-      // User doesn't exist in users table yet, create with free tier and default mejorAmigo archetype
+      // User doesn't exist in users table yet, create with free tier and default pareja archetype
       const { error: insertError } = await supabase
         .from('users')
-        .insert({ id: req.userId, tier: 'free', arquetipo_id: 'mejorAmigo' });
+        .insert({ id: req.userId, tier: 'free', arquetipo_id: 'pareja' });
 
       if (insertError) console.error('Error creating user row:', insertError);
 
@@ -74,9 +74,9 @@ export async function loadTier(req, res, next) {
     if (req.tier === 'free' && (!data.arquetipo_id || !isArchetypeAllowed('free', data.arquetipo_id))) {
       await supabase
         .from('users')
-        .update({ arquetipo_id: 'mejorAmigo' })
+        .update({ arquetipo_id: 'pareja' })
         .eq('id', req.userId);
-      data.arquetipo_id = 'mejorAmigo';
+      data.arquetipo_id = 'pareja';
     }
 
     // Reset daily counter if it's a new day
