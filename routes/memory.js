@@ -10,20 +10,22 @@ const router = Router();
  */
 router.get('/', async (req, res) => {
   try {
+    const characterId = req.query.character_id || 'pareja';
     const { data, error } = await supabase
       .from('memory_state')
       .select('*')
       .eq('user_id', req.userId)
+      .eq('character_id', characterId)
       .single();
 
     if (error && error.code === 'PGRST116') {
-      // No row found — return defaults (arquetipo_id is null so client uses its lumaActiveCharacter)
+      // No row found — return defaults
       return res.json({
         afinidad: 50, enojo: 0, cansancio: 0, ansiedad: 0,
         aburrimiento: 0, resentimiento: 0, celos: 0, nostalgia: 0,
         rasgos_identidad: [], memory_state: { episodios: [], conocimiento: {}, perfil_psicologico: '', characters_vault: {} },
         ignored_count: 0, arquetipo_id: null, dias_activos: [],
-        chat_history: []
+        chat_history: [], character_id: characterId
       });
     }
 
@@ -42,12 +44,13 @@ router.get('/', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
+    const characterId = req.body.character_id || 'pareja';
     // Whitelist allowed fields — reject anything else
     const ALLOWED_FIELDS = [
       'afinidad', 'enojo', 'cansancio', 'ansiedad', 'aburrimiento',
       'resentimiento', 'celos', 'nostalgia', 'rasgos_identidad',
       'memory_state', 'ignored_count', 'arquetipo_id', 'dias_activos',
-      'chat_history', 'sensitivities'
+      'chat_history', 'sensitivities', 'character_id'
     ];
 
     const sanitized = {};
@@ -101,13 +104,14 @@ router.post('/', async (req, res) => {
 
     const payload = {
       user_id: req.userId,
+      character_id: characterId,
       ...sanitized,
       updated_at: new Date().toISOString()
     };
 
     const { error } = await supabase
       .from('memory_state')
-      .upsert(payload, { onConflict: 'user_id' });
+      .upsert(payload, { onConflict: 'user_id,character_id' });
 
     if (error) throw error;
     res.json({ ok: true, evolutionApplied: isEvolutionAllowed });
@@ -123,8 +127,9 @@ router.post('/', async (req, res) => {
  */
 router.delete('/', async (req, res) => {
   try {
-    await supabase.from('memory_state').delete().eq('user_id', req.userId);
-    await supabase.from('episodes').delete().eq('user_id', req.userId);
+    const characterId = req.query.character_id || 'pareja';
+    await supabase.from('memory_state').delete().eq('user_id', req.userId).eq('character_id', characterId);
+    await supabase.from('episodes').delete().eq('user_id', req.userId).eq('character_id', characterId);
     res.json({ ok: true });
   } catch (err) {
     console.error('Memory DELETE error:', err);
@@ -138,6 +143,7 @@ router.delete('/', async (req, res) => {
  */
 router.get('/episodes', async (req, res) => {
   try {
+    const characterId = req.query.character_id || 'pareja';
     const queryStr = req.query.q || req.query.keywords || '';
     const rawKeywords = queryStr
       .split(',')
@@ -157,7 +163,8 @@ router.get('/episodes', async (req, res) => {
         query_embedding: queryEmbedding,
         match_threshold: 0.25,
         match_count: 3,
-        p_user_id: req.userId
+        p_user_id: req.userId,
+        p_character_id: characterId
       });
 
       if (!rpcError && vectorResults && vectorResults.length > 0) {
@@ -172,6 +179,7 @@ router.get('/episodes', async (req, res) => {
       .from('episodes')
       .select('text, created_at')
       .eq('user_id', req.userId)
+      .eq('character_id', characterId)
       .or(orCondition)
       .order('created_at', { ascending: false })
       .limit(3);
@@ -191,9 +199,10 @@ router.get('/episodes', async (req, res) => {
  */
 router.post('/episodes', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, character_id: charId } = req.body;
     if (!text) return res.status(400).json({ error: 'text requerido' });
 
+    const characterId = charId || 'pareja';
     const userId = req.userId;
 
     // Instant HTTP 200 response to client (~10ms latency)
@@ -203,7 +212,7 @@ router.post('/episodes', async (req, res) => {
     setImmediate(async () => {
       try {
         const embedding = await generateEmbedding(text);
-        const insertPayload = { user_id: userId, text };
+        const insertPayload = { user_id: userId, character_id: characterId, text };
         if (embedding) {
           insertPayload.embedding = embedding;
         }
@@ -223,6 +232,7 @@ router.post('/episodes', async (req, res) => {
           .from('episodes')
           .select('text')
           .eq('user_id', userId)
+          .eq('character_id', characterId)
           .lt('created_at', thirtyDaysAgo.toISOString());
 
         if (oldEpisodes && oldEpisodes.length > 0) {
@@ -235,6 +245,7 @@ router.post('/episodes', async (req, res) => {
               .from('memory_state')
               .select('memory_state')
               .eq('user_id', userId)
+              .eq('character_id', characterId)
               .single();
 
             const existingState = currentMemory?.memory_state || {};
@@ -247,12 +258,13 @@ router.post('/episodes', async (req, res) => {
               .from('memory_state')
               .upsert({
                 user_id: userId,
+                character_id: characterId,
                 memory_state: {
                   ...existingState,
                   perfil_psicologico: updatedProfile
                 },
                 updated_at: new Date().toISOString()
-              }, { onConflict: 'user_id' });
+              }, { onConflict: 'user_id,character_id' });
 
           }
 
@@ -261,6 +273,7 @@ router.post('/episodes', async (req, res) => {
             .from('episodes')
             .delete()
             .eq('user_id', userId)
+            .eq('character_id', characterId)
             .lt('created_at', thirtyDaysAgo.toISOString());
         }
       } catch (bgError) {
